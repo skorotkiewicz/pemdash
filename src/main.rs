@@ -3,7 +3,7 @@ use gtk4::glib::Propagation;
 use gtk4::prelude::*;
 use gtk4::{
     Align, Application, ApplicationWindow, Box as GtkBox, Button, CssProvider, Entry,
-    EventControllerKey, Label, Orientation, StyleContext,
+    EventControllerKey, Label, Orientation,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -108,13 +108,12 @@ fn build_ui(app: &Application) {
 
     {
         let current_result = current_result.clone();
-        let copy = copy.clone();
-        copy.connect_clicked(move |_| {
+        copy.connect_clicked(move |button| {
             if let Some(text) = current_result.borrow().as_deref()
                 && let Some(display) = gdk::Display::default()
             {
                 display.clipboard().set_text(text);
-                copy.set_label("Copied");
+                button.set_label("Copied");
             }
         });
     }
@@ -191,7 +190,7 @@ fn load_css() {
     );
 
     if let Some(display) = gdk::Display::default() {
-        StyleContext::add_provider_for_display(
+        gtk4::style_context_add_provider_for_display(
             &display,
             &provider,
             gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
