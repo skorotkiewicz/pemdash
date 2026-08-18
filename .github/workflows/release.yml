@@ -30,9 +30,15 @@ jobs:
       - run: cargo test --locked
 
   build:
-    name: x86_64-unknown-linux-gnu
+    name: ${{ matrix.target }}
     needs: quality
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu,  os: ubuntu-latest   }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-24.04-arm }
 
     steps:
       - uses: actions/checkout@v4
@@ -41,23 +47,25 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
       - uses: Swatinem/rust-cache@v2
 
       - name: Build
-        run: cargo build --release --locked
+        run: cargo build --release --locked --target ${{ matrix.target }}
 
       - name: Package
         run: |
           mkdir dist
-          cp target/release/pemdash dist/pemdash
+          cp target/${{ matrix.target }}/release/pemdash dist/pemdash
           cp README.md dist/README.md
-          tar -C dist -czf pemdash-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz pemdash README.md
+          tar -C dist -czf pemdash-${{ github.ref_name }}-${{ matrix.target }}.tar.gz pemdash README.md
 
       - uses: actions/upload-artifact@v4
         with:
-          name: pemdash-x86_64-unknown-linux-gnu
-          path: pemdash-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz
+          name: pemdash-${{ matrix.target }}
+          path: pemdash-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
           if-no-files-found: error
 
   release:
@@ -71,8 +79,9 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: pemdash-x86_64-unknown-linux-gnu
+          pattern: pemdash-*
           path: artifacts
+          merge-multiple: true
 
       - uses: softprops/action-gh-release@v2
         with:
