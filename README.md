@@ -2,6 +2,8 @@
 
 A small calculator overlay with proper operator precedence.
 
+![pemdash calculating 2+2*2](assets/screenshot.png)
+
 ## Install on Arch Linux
 
 ```bash
