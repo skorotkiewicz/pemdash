@@ -38,7 +38,8 @@ jobs:
           mkdir dist
           cp target/${{ matrix.target }}/release/pemdash dist/pemdash
           cp README.md dist/README.md
-          tar -C dist -czf pemdash-${{ github.ref_name }}-${{ matrix.target }}.tar.gz pemdash README.md
+          cp LICENSE dist/LICENSE
+          tar -C dist -czf pemdash-${{ github.ref_name }}-${{ matrix.target }}.tar.gz pemdash README.md LICENSE
 
       - uses: actions/upload-artifact@v4
         with:
@@ -96,8 +97,47 @@ jobs:
           pattern: pemdash-*
           merge-multiple: true
 
-      - name: Create release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*
           generate_release_notes: true
+
+  aur-publish:
+    name: Publish to AUR
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup builder user
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm git openssh pacman-contrib sudo
+          useradd -m builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+
+      - name: Update PKGBUILD and generate .SRCINFO
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          sed -i "s/^pkgver=.*/pkgver=$VERSION/" PKGBUILD
+          sed -i 's/^pkgrel=.*/pkgrel=1/' PKGBUILD
+          sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE' && updpkgsums && makepkg --printsrcinfo > .SRCINFO"
+
+      - name: Publish AUR package
+        uses: KSXGitHub/github-actions-deploy-aur@v4.1.2
+        with:
+          pkgname: pemdash
+          pkgbuild: ./PKGBUILD
+          assets: |
+            ./.SRCINFO
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: "aur: ${{ github.ref_name }}"
+          ssh_keyscan_types: rsa,ecdsa,ed25519
