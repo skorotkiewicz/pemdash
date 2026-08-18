@@ -2,6 +2,12 @@
 
 A small calculator overlay with proper operator precedence.
 
+## Install on Arch Linux
+
+```bash
+yay -S pemdash
+```
+
 ## Use
 
 ```bash
