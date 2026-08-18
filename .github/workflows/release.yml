@@ -1,0 +1,80 @@
+name: Release pemdash
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  quality:
+    name: Test and lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install GTK 4
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo fmt -- --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test --locked
+
+  build:
+    name: x86_64-unknown-linux-gnu
+    needs: quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install GTK 4
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release --locked
+
+      - name: Package
+        run: |
+          mkdir dist
+          cp target/release/pemdash dist/pemdash
+          cp README.md dist/README.md
+          tar -C dist -czf pemdash-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz pemdash README.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pemdash-x86_64-unknown-linux-gnu
+          path: pemdash-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: pemdash-x86_64-unknown-linux-gnu
+          path: artifacts
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
