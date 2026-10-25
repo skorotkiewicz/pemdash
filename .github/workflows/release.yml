@@ -112,6 +112,11 @@ jobs:
           Copy-Item target/${{ matrix.target }}/release/pemdash.exe dist/
           Copy-Item README.md, BUILD.md, LICENSE, "$prefix/GTK-SDK.txt" dist/
           Copy-Item "$prefix/bin/*.dll" dist/
+          # GLib needs these executables to launch redirected subprocesses,
+          # including PowerShell for persistent clipboard copying.
+          foreach ($helper in @('gspawn-win64-helper.exe', 'gspawn-win64-helper-console.exe')) {
+            Copy-Item "$prefix/bin/$helper" dist/ -ErrorAction Stop
+          }
           # Preserve runtime assets and third-party licenses (share/doc).
           foreach ($directory in @('share', 'etc', 'lib/gdk-pixbuf-2.0', 'lib/gio')) {
             if (Test-Path "$prefix/$directory") {
@@ -153,7 +158,7 @@ jobs:
           # Never let the runner's installed VC runtime mask a missing CRT DLL.
           $rootDlls = @{}
           Get-ChildItem dist -Filter *.dll | ForEach-Object { $rootDlls[$_.Name] = $true }
-          $binaries = @(Get-Item dist/pemdash.exe) + @(Get-ChildItem dist -Filter *.dll -Recurse)
+          $binaries = @(Get-ChildItem dist -File -Recurse | Where-Object { $_.Extension -in '.exe', '.dll' })
           foreach ($binary in $binaries) {
             $imports = & dumpbin.exe /NOLOGO /IMPORTS $binary.FullName
             if ($LASTEXITCODE -ne 0) { throw "Cannot inspect $($binary.FullName)" }

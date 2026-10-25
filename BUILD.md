@@ -4,7 +4,7 @@
 
 Use a current stable Rust toolchain with support for edition 2024. On Linux/macOS, install Rust via [rustup](https://rustup.rs/). The commands below run from the repository root.
 
-The app is written in Rust, but the `gtk4` crate links to the native GTK library. Building from source therefore also needs GTK development packages, `pkg-config` to locate them, and a C toolchain (GCC or Clang) for linking. These build tools are not required to run a prebuilt binary; the GTK runtime still is.
+The app is written in Rust, but the `gtk4` crate links to the native GTK library. Building from source therefore also needs GTK development files, `pkg-config` to locate them, and a native C/C++ toolchain for linking (GCC/Clang on Linux/macOS, MSVC on Windows). These build tools are not required to run a prebuilt binary; the GTK runtime still is, either installed separately or bundled with the Windows ZIP.
 
 ### Linux
 
@@ -47,34 +47,44 @@ cargo build --release --locked
 
 Use a native terminal/toolchain, not Rosetta for the ARM64 build. GTK must remain installed when running the resulting binary; `pbcopy` is already part of macOS.
 
-### Windows x86_64 (MSYS2 UCRT64)
+### Windows x86_64 (native MSVC)
 
-After updating MSYS2, run these commands in its **UCRT64** shell:
+Install stable Rust through [rustup](https://rustup.rs/) and Visual Studio Build Tools with the **Desktop development with C++** workload. Use a **Developer PowerShell for Visual Studio** terminal with x64 tools. No MSYS2 installation or shell is required.
 
-```bash
-pacman -S --needed mingw-w64-ucrt-x86_64-rust \
-  mingw-w64-ucrt-x86_64-gtk4 \
-  mingw-w64-ucrt-x86_64-pkgconf \
-  mingw-w64-ucrt-x86_64-gcc
+Download the native MSVC GTK 4 SDK from [Gvsbuild releases](https://github.com/wingtk/gvsbuild/releases). The release workflow pins version **2026.8.0**, asset `GTK4_Gvsbuild_2026.8.0_x64.zip`, and verifies its SHA-256:
 
-# Must report host: x86_64-pc-windows-gnu, using /ucrt64/bin/rustc.
-which rustc
-rustc -vV
-cargo build --release --locked --target x86_64-pc-windows-gnu
-./target/x86_64-pc-windows-gnu/release/pemdash.exe
+```text
+1f95a92d037f5292da05e6ab1037032ff21ddb7b20d4ac8e83e3674c864c07b0
 ```
 
-Use the MSYS2-provided Rust/Cargo and UCRT64 GTK toolchain together, rather than mixing in an MSVC Rust toolchain or MINGW64 libraries. The same MSYS2 runtime requirements apply to locally built binaries and release ZIPs.
+Verify the downloaded ZIP with `Get-FileHash -Algorithm SHA256`, then extract it so that `C:\gtk` contains the SDK's `bin`, `lib`, and `share` directories. Configure the SDK in your current PowerShell session:
 
-### Tests and CI
+```powershell
+$gtk = 'C:\gtk'
+$env:PATH = "$gtk\bin;$env:PATH"
+$env:PKG_CONFIG = "$gtk\bin\pkg-config.exe"
+$env:PKG_CONFIG_PATH = "$gtk\lib\pkgconfig"
 
-```bash
-cargo test --locked --all-features
+# Replace the upstream builder's prefix with this SDK's extraction directory.
+$pcPrefix = $gtk.Replace('\', '/')
+Get-ChildItem "$gtk\lib\pkgconfig\*.pc" | ForEach-Object {
+    $content = Get-Content -LiteralPath $_.FullName -Raw
+    $content = $content -replace '(?m)^prefix=.*$', "prefix=$pcPrefix"
+    Set-Content -LiteralPath $_.FullName -Value $content -Encoding utf8NoBOM
+}
+
+rustup toolchain install stable-x86_64-pc-windows-msvc
+cargo +stable-x86_64-pc-windows-msvc build --release --locked --target x86_64-pc-windows-msvc
+.\target\x86_64-pc-windows-msvc\release\pemdash.exe
 ```
 
-Ordinary unit and documentation tests do not require a graphical display or access to the real clipboard; subprocess tests use fixture commands (including built-in `powershell.exe` on Windows). The explicitly ignored GUI/clipboard integration test is not run by default and requires a suitable desktop session and helpers.
+Use PowerShell 7 for the `utf8NoBOM` encoding option above. GTK libraries must be built for MSVC; do not mix MinGW GTK libraries with this Rust target. Locally built binaries require the SDK runtime on `PATH`. Release ZIPs additionally bundle GTK and the redistributable MSVC runtime DLLs, so users do not need the SDK installed.
 
-The release workflow runs only when a `v*` tag is pushed or when started manually. Ordinary branch pushes and pull requests do not trigger it. It tests and builds all five targets natively, retains the Linux format/Clippy quality job, and only publishes releases/AUR updates for tag builds. For Windows, it uses MSYS2 Rust and GTK in UCRT64; for macOS, it uses Homebrew GTK. CI builds do not validate interactive UI behavior, clipboard integration, or standalone deployment.
+### CI
+
+The release workflow runs only when a `v*` tag is pushed or when started manually with `workflow_dispatch`. Ordinary branch pushes and pull requests do not trigger it.
+
+It builds all five targets natively, retains the Linux format/Clippy quality job, and only publishes releases/AUR updates for tag builds. Windows uses native MSVC Rust and the pinned Gvsbuild GTK SDK; macOS uses Homebrew GTK. Automated unit and GUI tests are not run by this workflow. Windows packaging checks DLL imports and required runtime assets, but does not launch the app or verify interactive behavior.
 
 ## Use
 
@@ -94,10 +104,10 @@ The release workflow builds these native targets; each archive contains the bina
 | Linux ARM64 | `pemdash-v<version>-aarch64-unknown-linux-gnu.tar.gz` |
 | macOS Apple Silicon | `pemdash-v<version>-aarch64-apple-darwin.tar.gz` |
 | macOS Intel | `pemdash-v<version>-x86_64-apple-darwin.tar.gz` |
-| Windows x86_64 (GNU / UCRT64) | `pemdash-v<version>-x86_64-pc-windows-gnu.zip` |
+| Windows x86_64 (MSVC) | `pemdash-v<version>-x86_64-pc-windows-msvc.zip` |
 
-These are **not self-contained application bundles**. GTK and its runtime dependencies must be installed separately, as described below. Extract the archive for your architecture and run `./pemdash` on Linux/macOS, or `./pemdash.exe` from an MSYS2 UCRT64 shell on Windows. A graphical desktop session is required to use the app.
+Linux and macOS archives require a separately installed GTK runtime. The Windows ZIP bundles GTK and MSVC runtime DLLs. Extract the archive for your architecture and run `./pemdash` on Linux/macOS, or double-click `pemdash.exe` on Windows. A graphical desktop session is required to use the app.
 
 - **Linux:** requires system GTK 4 and glibc compatible with the Ubuntu build runner (`ubuntu-latest` for x86_64, `ubuntu-24.04-arm` for ARM64). These are not static binaries or a promise of compatibility with older distributions. On Debian/Ubuntu, install `libgtk-4-1`; on Arch, install `gtk4`. Clipboard copying additionally requires `wl-clipboard` on Wayland or `xclip` on X11, available on `PATH`.
 - **macOS:** builds run natively on macOS 15 for both architectures and link to Homebrew GTK 4. Install `brew install gtk4`; the matching Homebrew installation must remain available at the build prefix (`/opt/homebrew` for Apple Silicon, `/usr/local` for Intel). The archive does not bundle dylibs, relocate Homebrew dependencies, or provide a signed/notarized `.app`. Compatibility with older macOS versions is not established. Clipboard copying uses the built-in `/usr/bin/pbcopy`.
-- **Windows:** the ZIP contains an **unbundled executable, not a standalone Windows app**. Install [MSYS2](https://www.msys2.org/), update it with `pacman -Syu` (restart the shell and repeat if prompted), and open **MSYS2 UCRT64**, not MSYS or MINGW64. Run `pacman -S mingw-w64-ucrt-x86_64-gtk4`, then launch the extracted `pemdash.exe` from that shell. Keep the MSYS2 installation: `/ucrt64/bin` supplies GTK and its dependency DLLs through `PATH`, and the matching `/ucrt64/share` installation supplies GTK assets, schemas, and icon themes. Do not copy just the EXE to another machine and expect it to work. Clipboard copying uses built-in Windows PowerShell (`powershell.exe` with `Set-Clipboard`), which must also be reachable on `PATH`; no additional clipboard package is needed.
+- **Windows:** extract the **entire ZIP** into a folder, then double-click `pemdash.exe`. No MSYS2 installation or GTK setup is required. Keep the DLLs and bundled `share`, `lib`, and `etc` directories beside the EXE; moving only the EXE will break it. `GTK-SDK.txt` records the SDK source and checksum, and third-party license notices are under `share/doc`. Clipboard copying uses built-in Windows PowerShell (`powershell.exe` with `Set-Clipboard`), which must be reachable on `PATH`; no extra clipboard package is needed. This is an unsigned executable, not an installer.
