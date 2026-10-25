@@ -77,11 +77,11 @@ fn tokenize(expression: &str) -> Result<Vec<Token>, String> {
             }
 
             let number: String = chars[start..position].iter().collect();
-            tokens.push(Token::Number(
+            tokens.push(Token::Number(finite_result(
                 number
                     .parse()
                     .map_err(|_| format!("Invalid number: {number}"))?,
-            ));
+            )?));
             continue;
         }
 
@@ -140,7 +140,7 @@ impl Parser {
             self.position += 1;
             let next_minimum = precedence + u8::from(operator != '^');
             let right = self.parse_expression(next_minimum)?;
-            value = apply_operator(operator, value, right);
+            value = apply_operator(operator, value, right)?;
         }
 
         Ok(value)
@@ -212,15 +212,26 @@ fn precedence(operator: char) -> u8 {
     }
 }
 
-fn apply_operator(operator: char, left: f64, right: f64) -> f64 {
-    match operator {
+fn finite_result(value: f64) -> Result<f64, String> {
+    if value.is_nan() {
+        Err("Result is not a real number".into())
+    } else if !value.is_finite() {
+        Err("Result is outside the finite range".into())
+    } else {
+        Ok(value)
+    }
+}
+
+fn apply_operator(operator: char, left: f64, right: f64) -> Result<f64, String> {
+    finite_result(match operator {
         '+' => left + right,
         '-' => left - right,
         '*' => left * right,
+        '/' if right == 0.0 => return Err("Division by zero".into()),
         '/' => left / right,
         '^' => left.powf(right),
         _ => unreachable!(),
-    }
+    })
 }
 
 fn apply_function(name: &str, arguments: &[f64]) -> Result<f64, String> {
@@ -233,7 +244,7 @@ fn apply_function(name: &str, arguments: &[f64]) -> Result<f64, String> {
         _ => Err(format!("{name} expects two arguments")),
     };
 
-    match name {
+    let value = match name {
         "sin" => unary(f64::sin),
         "cos" => unary(f64::cos),
         "tan" => unary(f64::tan),
@@ -258,7 +269,9 @@ fn apply_function(name: &str, arguments: &[f64]) -> Result<f64, String> {
         }
         "min" | "max" => Err(format!("{name} expects at least one argument")),
         _ => Err(format!("Unknown function: {name}")),
-    }
+    }?;
+
+    finite_result(value)
 }
 
 fn token_name(token: &Token) -> &str {
@@ -314,6 +327,110 @@ mod tests {
             calculate("50 / sqrt(3) * 1e5 =").unwrap(),
             2_886_751.345_948_129,
         );
+    }
+
+    #[test]
+    fn rejects_non_finite_literals_and_results() {
+        for expression in [
+            "1e999",
+            "-1e999",
+            "1e308 + 1e308",
+            "1e308 * 2",
+            "exp(1000)",
+            "ln(0)",
+        ] {
+            assert_eq!(
+                calculate(expression).unwrap_err(),
+                "Result is outside the finite range",
+                "{expression}"
+            );
+        }
+        for expression in ["sqrt(-1)", "ln(-1)", "asin(2)", "(-1)^0.5", "pow(-1, 0.5)"] {
+            assert_eq!(
+                calculate(expression).unwrap_err(),
+                "Result is not a real number",
+                "{expression}"
+            );
+        }
+        for expression in ["1 / 0", "0 / 0", "1 / -0"] {
+            assert_eq!(
+                calculate(expression).unwrap_err(),
+                "Division by zero",
+                "{expression}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_intermediate_results() {
+        for expression in [
+            "(1 / 0)^0",
+            "1 / 1e999",
+            "(1e308 * 2)^0",
+            "sqrt(-1)^0",
+            "min(sqrt(-1), 2)",
+            "max(2, sqrt(-1))",
+            "pow(exp(1000), 0)",
+        ] {
+            assert!(calculate(expression).is_err(), "{expression}");
+        }
+    }
+
+    #[test]
+    fn preserves_finite_boundary_values() {
+        assert_eq!(calculate("1e308").unwrap(), 1e308);
+        assert_eq!(calculate("1e-308").unwrap(), 1e-308);
+        assert_eq!(calculate("0 / 2").unwrap(), 0.0);
+        assert_eq!(calculate("min(-2, 0, 3)").unwrap(), -2.0);
+        assert_eq!(calculate("max(-2, 0, 3)").unwrap(), 3.0);
+    }
+
+    #[test]
+    fn tokenizes_numbers_and_rejects_invalid_characters() {
+        assert_close(calculate(" .5 + 1. + 2E-1 ").unwrap(), 1.7);
+        for expression in ["1e", "1e+", "1e-", "2 @ 3", "2pi"] {
+            assert!(calculate(expression).is_err(), "{expression}");
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_arguments_and_wrong_arity() {
+        for expression in [
+            "sqrt(1, 2)",
+            "pow(2)",
+            "pow(2, 3, 4)",
+            "min()",
+            "max()",
+            "min(,1)",
+            "min(1,)",
+            "min(1,,2)",
+            "min(1 2)",
+            "min(1,2",
+        ] {
+            assert!(calculate(expression).is_err(), "{expression}");
+        }
+    }
+
+    #[test]
+    fn supports_documented_functions() {
+        for (expression, expected) in [
+            ("asin(0)", 0.0),
+            ("acos(1)", 0.0),
+            ("atan(0)", 0.0),
+            ("atan2(0, 1)", 0.0),
+            ("exp(0)", 1.0),
+            ("floor(1.9)", 1.0),
+            ("ceil(1.1)", 2.0),
+            ("round(1.5)", 2.0),
+            ("pow(2, 3)", 8.0),
+            ("cos(0)", 1.0),
+            ("tan(0)", 0.0),
+            ("abs(-2)", 2.0),
+            ("ln(e)", 1.0),
+            ("log10(100)", 2.0),
+        ] {
+            assert_close(calculate(expression).unwrap(), expected);
+        }
     }
 
     #[test]
