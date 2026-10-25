@@ -74,7 +74,7 @@ cargo test --locked --all-features
 
 Ordinary unit and documentation tests do not require a graphical display or access to the real clipboard; subprocess tests use fixture commands (including built-in `powershell.exe` on Windows). The explicitly ignored GUI/clipboard integration test is not run by default and requires a suitable desktop session and helpers.
 
-The existing release workflow also runs on pull requests and pushes to `main`/`dev`. It tests and builds all five targets natively, retains the Linux format/Clippy quality job, and only publishes releases/AUR updates for tag builds (`v*` tags trigger automatically). For Windows, it uses MSYS2 Rust and GTK in UCRT64; for macOS, it uses Homebrew GTK. CI builds do not validate interactive UI behavior, clipboard integration, or standalone deployment.
+The release workflow runs only when a `v*` tag is pushed or when started manually. Ordinary branch pushes and pull requests do not trigger it. It tests and builds all five targets natively, retains the Linux format/Clippy quality job, and only publishes releases/AUR updates for tag builds. For Windows, it uses MSYS2 Rust and GTK in UCRT64; for macOS, it uses Homebrew GTK. CI builds do not validate interactive UI behavior, clipboard integration, or standalone deployment.
 
 ## Use
 
