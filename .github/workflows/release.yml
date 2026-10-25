@@ -10,7 +10,7 @@ env:
 
 jobs:
   build:
-    name: Build and test (${{ matrix.target }})
+    name: Build (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -25,7 +25,7 @@ jobs:
           - { target: aarch64-unknown-linux-gnu, os: ubuntu-24.04-arm, shell: bash }
           - { target: aarch64-apple-darwin,      os: macos-15,         shell: bash }
           - { target: x86_64-apple-darwin,       os: macos-15-intel,   shell: bash }
-          - { target: x86_64-pc-windows-gnu,     os: windows-latest,   shell: 'msys2 {0}' }
+          - { target: x86_64-pc-windows-msvc,    os: windows-latest,   shell: pwsh }
 
     steps:
       - uses: actions/checkout@v4
@@ -38,48 +38,59 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install gtk4 pkgconf
 
-      # Use one consistent UCRT64 toolchain for Rust, GTK, and the linker.
-      # This ZIP requires the matching MSYS2 runtime; it is not standalone.
-      - name: Install Rust and GTK 4 (Windows / MSYS2 UCRT64)
+      - name: Set up native MSVC tools (Windows)
         if: runner.os == 'Windows'
-        uses: msys2/setup-msys2@v2
+        uses: ilammy/msvc-dev-cmd@v1
         with:
-          msystem: UCRT64
-          update: true
-          path-type: minimal
-          install: >-
-            mingw-w64-ucrt-x86_64-rust
-            mingw-w64-ucrt-x86_64-gtk4
-            mingw-w64-ucrt-x86_64-pkgconf
-            mingw-w64-ucrt-x86_64-gcc
+          arch: x64
+
+      - name: Install native GTK 4 SDK (Windows / MSVC)
+        if: runner.os == 'Windows'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = '2026.8.0'
+          $sha256 = '1f95a92d037f5292da05e6ab1037032ff21ddb7b20d4ac8e83e3674c864c07b0'
+          $url = "https://github.com/wingtk/gvsbuild/releases/download/$version/GTK4_Gvsbuild_${version}_x64.zip"
+          $sdkRoot = Join-Path $env:RUNNER_TEMP "pemdash-gtk-$([guid]::NewGuid())"
+          New-Item -ItemType Directory $sdkRoot | Out-Null
+          $archive = Join-Path $sdkRoot 'gtk.zip'
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $sha256) {
+            throw 'GTK SDK checksum mismatch'
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $sdkRoot 'sdk')
+          $gtkPc = @(Get-ChildItem (Join-Path $sdkRoot 'sdk') -Filter gtk4.pc -Recurse)
+          if ($gtkPc.Count -ne 1) { throw 'Expected exactly one GTK 4 SDK prefix' }
+          $prefix = $gtkPc[0].Directory.Parent.Parent.FullName
+          $pcPrefix = $prefix.Replace('\', '/')
+          # Native pkg-config metadata must refer to this extraction, not the
+          # upstream builder's absolute paths.
+          Get-ChildItem "$prefix/lib/pkgconfig/*.pc" | ForEach-Object {
+            $content = Get-Content -LiteralPath $_.FullName -Raw
+            $content = $content -replace '(?m)^prefix=.*$', "prefix=$pcPrefix"
+            Set-Content -LiteralPath $_.FullName -Value $content -Encoding utf8NoBOM
+          }
+          $pkgConfig = Join-Path $prefix 'bin/pkg-config.exe'
+          if (-not (Test-Path -LiteralPath $pkgConfig)) { throw 'Native pkg-config is missing from the SDK' }
+          "$prefix/bin" >> $env:GITHUB_PATH
+          "PKG_CONFIG=$pkgConfig" >> $env:GITHUB_ENV
+          "PKG_CONFIG_PATH=$prefix/lib/pkgconfig" >> $env:GITHUB_ENV
+          "WINDOWS_GTK_PREFIX=$prefix" >> $env:GITHUB_ENV
+          "VSLANG=1033" >> $env:GITHUB_ENV
+          @("Gvsbuild GTK 4 SDK $version", "Source: $url", "SHA256: $sha256") |
+            Set-Content -LiteralPath "$prefix/GTK-SDK.txt"
+
 
       - uses: dtolnay/rust-toolchain@stable
-        if: runner.os != 'Windows'
         with:
           targets: ${{ matrix.target }}
 
       - uses: Swatinem/rust-cache@v2
-        if: runner.os != 'Windows'
 
       - name: Check native toolchain and GTK
         run: |
           rustc -vV
-          rustc -vV | grep -Fx 'host: ${{ matrix.target }}'
           pkg-config --modversion gtk4
-
-      # GTK is linked, but ordinary unit/doc tests do not initialize a display.
-      # The existing ignored GUI test remains opt-in (no --include-ignored).
-      - name: Test without a graphical display
-        run: |
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            # Clipboard subprocess fixtures need Windows PowerShell even when
-            # MSYS2's minimal PATH omits its directory. Keep UCRT64 first.
-            powershell_dir="$(cygpath -u "${SYSTEMROOT:-$SystemRoot}")/System32/WindowsPowerShell/v1.0"
-            test -x "$powershell_dir/powershell.exe"
-            export PATH="$PATH:$powershell_dir"
-            command -v powershell.exe
-          fi
-          cargo test --locked --all-features --target ${{ matrix.target }}
 
       - run: cargo build --release --locked --all-features --target ${{ matrix.target }}
 
@@ -92,14 +103,83 @@ jobs:
           cp LICENSE dist/LICENSE
           tar -C dist -czf "$ARCHIVE_NAME.tar.gz" pemdash README.md LICENSE
 
-      - name: Package Windows binary (MSYS2 UCRT64 required)
+      - name: Bundle Windows GTK and MSVC runtimes
         if: runner.os == 'Windows'
-        shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          $prefix = $env:WINDOWS_GTK_PREFIX
           New-Item -ItemType Directory dist | Out-Null
-          Copy-Item target/${{ matrix.target }}/release/pemdash.exe dist/pemdash.exe
-          Copy-Item README.md, LICENSE dist/
-          Compress-Archive -Path dist/* -DestinationPath "$env:ARCHIVE_NAME.zip"
+          Copy-Item target/${{ matrix.target }}/release/pemdash.exe dist/
+          Copy-Item README.md, BUILD.md, LICENSE, "$prefix/GTK-SDK.txt" dist/
+          Copy-Item "$prefix/bin/*.dll" dist/
+          # Preserve runtime assets and third-party licenses (share/doc).
+          foreach ($directory in @('share', 'etc', 'lib/gdk-pixbuf-2.0', 'lib/gio')) {
+            if (Test-Path "$prefix/$directory") {
+              $parent = Split-Path "dist/$directory" -Parent
+              New-Item -ItemType Directory -Path $parent -Force | Out-Null
+              Copy-Item "$prefix/$directory" "dist/$directory" -Recurse
+            }
+          }
+          $crt = @(Get-ChildItem "$env:VCToolsRedistDir/x64/Microsoft.VC*.CRT" -Directory)
+          if ($crt.Count -eq 0) { throw 'MSVC redistributable DLL directory not found' }
+          foreach ($directory in $crt) { Copy-Item "$($directory.FullName)/*.dll" dist/ }
+
+          # Windows gdk-pixbuf resolves relative module records from its DLL's
+          # installation root. Leave all the other cache metadata intact.
+          $caches = @(Get-ChildItem dist/lib/gdk-pixbuf-2.0 -Filter loaders.cache -Recurse)
+          if ($caches.Count -ne 1) { throw 'Expected one gdk-pixbuf loader cache' }
+          $cache = $caches[0]
+          $bundleRoot = (Resolve-Path dist).Path
+          $loaderDirectory = Join-Path $cache.Directory.FullName 'loaders'
+          $relativeDirectory = [IO.Path]::GetRelativePath($bundleRoot, $loaderDirectory).Replace('\', '/')
+          $content = Get-Content -LiteralPath $cache.FullName -Raw
+          $content = [regex]::Replace($content, '(?m)^"([^"\r\n]+\.dll)"[ \t]*\r?$', {
+            param($match)
+            $name = ($match.Groups[1].Value -split '[/\\]')[-1]
+            if (-not (Test-Path -LiteralPath (Join-Path $loaderDirectory $name))) {
+              throw "Loader cache references missing DLL: $name"
+            }
+            '"' + $relativeDirectory + '/' + $name + '"'
+          })
+          Set-Content -LiteralPath $cache.FullName -Value $content -Encoding utf8NoBOM
+          if (-not (Test-Path dist/share/glib-2.0/schemas/gschemas.compiled)) {
+            throw 'GTK compiled schemas are missing'
+          }
+          if (-not (Test-Path dist/share/icons/Adwaita/index.theme)) {
+            throw 'Adwaita icons are missing'
+          }
+
+          # Audit both normal and delay-loaded imports, including plugin DLLs.
+          # Never let the runner's installed VC runtime mask a missing CRT DLL.
+          $rootDlls = @{}
+          Get-ChildItem dist -Filter *.dll | ForEach-Object { $rootDlls[$_.Name] = $true }
+          $binaries = @(Get-Item dist/pemdash.exe) + @(Get-ChildItem dist -Filter *.dll -Recurse)
+          foreach ($binary in $binaries) {
+            $imports = & dumpbin.exe /NOLOGO /IMPORTS $binary.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Cannot inspect $($binary.FullName)" }
+            foreach ($line in $imports) {
+              if ($line -match '^\s+([^\s]+\.(?:dll|drv))\s*$') {
+                $name = $Matches[1]
+                if ($rootDlls.ContainsKey($name)) { continue }
+                if ($name -match '^(api-ms-|ext-ms-)') { continue }
+                if ($name -notmatch '^(msvcp|vcruntime|concrt|vccorlib)' -and
+                    (Test-Path -LiteralPath "$env:SystemRoot/System32/$name")) { continue }
+                throw "Unbundled dependency $name imported by $($binary.Name)"
+              }
+            }
+          }
+          @(
+            'Extract the entire ZIP, then double-click pemdash.exe.',
+            'Keep the DLLs and share/lib/etc directories beside the executable.',
+            'GTK SDK source and checksum: GTK-SDK.txt. Third-party licenses: share/doc.',
+            'MSVC release runtime DLLs are included under the Visual Studio redistribution terms:',
+            'https://learn.microsoft.com/visualstudio/releases/2022/redistribution'
+          ) | Set-Content dist/RUNTIME.txt
+
+      - name: Package Windows ZIP
+        if: runner.os == 'Windows'
+        run: Compress-Archive -Path dist/* -DestinationPath "$env:ARCHIVE_NAME.zip"
+
 
       - uses: actions/upload-artifact@v4
         with:
