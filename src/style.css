@@ -1,8 +1,8 @@
 window.pemdash {
-    background: #17171c;
-    color: #eeeef4;
-    border: 1px solid #393841;
-    border-radius: 18px;
+    background: #181818;
+    color: #eeeeee;
+    border: 1px solid #3c3c3c;
+    border-radius: 0;
     font-family: "Inter", "Cantarell", sans-serif;
     font-size: 13px;
 }
@@ -14,10 +14,10 @@ window.pemdash {
 .pemdash .brand-mark {
     min-width: 30px;
     min-height: 30px;
-    border: 1px solid #51456e;
-    border-radius: 9px;
-    background: #30283f;
-    color: #d3baff;
+    border: 1px solid #4c4c4c;
+    border-radius: 0;
+    background: #282828;
+    color: #dddddd;
     font-family: monospace;
     font-size: 22px;
     font-weight: 700;
@@ -31,7 +31,7 @@ window.pemdash {
 
 .pemdash .subtitle {
     margin-left: 6px;
-    color: #a3a1ae;
+    color: #a3a3a3;
     font-size: 12px;
 }
 
@@ -41,21 +41,21 @@ window.pemdash {
     min-height: 28px;
     padding: 2px;
     border: 1px solid transparent;
-    border-radius: 8px;
+    border-radius: 0;
     background: transparent;
     box-shadow: none;
-    color: #a3a1ae;
+    color: #a3a3a3;
 }
 
 .pemdash button.quiet-button:hover,
 .pemdash menubutton.quiet-button > button:hover,
 .pemdash menubutton.quiet-button > button:checked {
-    background: #2b2933;
-    color: #eeeef4;
+    background: #2c2c2c;
+    color: #eeeeee;
 }
 
 .pemdash .eyebrow {
-    color: #aaa7b8;
+    color: #aaaaaa;
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 1.6px;
@@ -64,24 +64,25 @@ window.pemdash {
 .pemdash entry.expression {
     min-height: 50px;
     padding: 0 14px;
-    border: 1px solid #44414f;
-    border-radius: 10px;
-    background: #202027;
+    border: 1px solid #444444;
+    border-radius: 0;
+    background: #222222;
     box-shadow: none;
-    color: #f4f1ff;
-    caret-color: #ccb0ff;
+    outline: none;
+    color: #f2f2f2;
+    caret-color: #dddddd;
     font-family: "JetBrains Mono", "DejaVu Sans Mono", monospace;
     font-size: 19px;
     transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .pemdash entry.expression:focus-within {
-    border-color: #b49ae6;
-    box-shadow: 0 0 0 3px alpha(#b49ae6, 0.12);
+    border-color: #999999;
+    box-shadow: 0 0 0 2px alpha(#cccccc, 0.08);
 }
 
 .pemdash entry.expression image {
-    color: #b49ae6;
+    color: #bbbbbb;
     margin-right: 10px;
     -gtk-icon-size: 18px;
 }
@@ -89,67 +90,67 @@ window.pemdash {
 .pemdash entry.expression image.right {
     margin-right: 0;
     margin-left: 10px;
-    color: #aaa7b8;
+    color: #aaaaaa;
 }
 
 .pemdash entry.expression text placeholder {
-    color: #a3a1ae;
+    color: #a3a3a3;
     opacity: 1;
 }
 
 .pemdash entry.expression selection,
 .pemdash label.result selection {
-    background: #574572;
+    background: #505050;
     color: #ffffff;
 }
 
 .pemdash .result-card {
     padding: 14px 16px;
-    border: 1px solid #34323d;
-    border-radius: 12px;
-    background: #1e1d25;
+    border: 1px solid #383838;
+    border-radius: 0;
+    background: #202020;
     transition: border-color 150ms ease;
 }
 
 .pemdash .result-card.valid {
-    border-color: #514265;
+    border-color: #585858;
 }
 
 .pemdash .result-card.invalid {
-    border-color: #7d4a53;
+    border-color: #805858;
 }
 
 .pemdash .status {
-    color: #a3a1ae;
+    color: #a3a3a3;
     font-size: 11px;
 }
 
 .pemdash .valid .status {
-    color: #c4acdf;
+    color: #c5c5c5;
 }
 
 .pemdash .invalid .status,
 .pemdash .status.error {
-    color: #f0a4af;
+    color: #d9a3a3;
 }
 
 .pemdash label.result {
     min-height: 42px;
-    color: #e0ccff;
+    color: #e5e5e5;
     font-family: "JetBrains Mono", "DejaVu Sans Mono", monospace;
     font-size: 30px;
     font-weight: 500;
 }
 
 .pemdash label.result.empty {
-    color: #aaa7b8;
+    color: #aaaaaa;
     font-family: "Inter", "Cantarell", sans-serif;
     font-size: 18px;
     font-weight: 400;
 }
 
 .pemdash label.result.error {
-    color: #f0a4af;
+    color: #d9a3a3;
     font-family: "Inter", "Cantarell", sans-serif;
     font-size: 16px;
     font-weight: 400;
@@ -159,87 +160,106 @@ window.pemdash {
     min-width: 66px;
     min-height: 34px;
     padding: 0 12px;
-    border: 1px solid #c1a4f1;
-    border-radius: 8px;
-    background: #c1a4f1;
+    border: 1px solid #cccccc;
+    border-radius: 0;
+    background: #cccccc;
     box-shadow: none;
-    color: #21182f;
+    color: #202020;
     font-size: 12px;
     font-weight: 700;
     transition: background 150ms ease;
 }
 
 .pemdash button.copy:hover {
-    background: #d5baff;
+    background: #e0e0e0;
 }
 
 .pemdash button.copy:active {
-    background: #ac8adf;
+    background: #b0b0b0;
 }
 
 .pemdash button.copy:disabled {
-    border-color: #403a4a;
-    background: #302b39;
-    color: #a49aaf;
+    border-color: #404040;
+    background: #303030;
+    color: #999999;
 }
 
 .pemdash button.copy.copied {
-    border-color: #96ceb5;
-    background: #96ceb5;
-    color: #172b21;
+    border-color: #eeeeee;
+    background: #eeeeee;
+    color: #202020;
 }
 
-.pemdash button:focus-visible {
-    outline: 2px solid #d3baff;
+.pemdash button:focus-visible,
+.pemdash switch:focus-visible {
+    outline: 2px solid #cccccc;
     outline-offset: 3px;
 }
 
 .pemdash .keycap {
     padding: 3px 6px;
-    border: 1px solid #46424f;
+    border: 1px solid #464646;
     border-bottom-width: 2px;
-    border-radius: 5px;
-    background: #24222b;
-    color: #c9c5d5;
+    border-radius: 0;
+    background: #242424;
+    color: #cccccc;
     font-size: 10px;
 }
 
 .pemdash .shortcut-description {
     margin-right: 12px;
-    color: #aaa7b8;
+    color: #aaaaaa;
     font-size: 11px;
 }
 
-.pemdash button.mode {
-    min-width: 40px;
-    padding: 4px 8px;
-    border: 1px solid #46424f;
-    border-radius: 6px;
-    background: #24222b;
-    box-shadow: none;
-    color: #aaa7b8;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 1px;
+.pemdash .angle-control {
+    margin-left: 12px;
 }
 
-.pemdash button.mode:hover,
-.pemdash button.mode:checked {
-    border-color: #b49ae6;
-    background: #342c40;
-    color: #e0ccff;
+.pemdash .angle-unit {
+    color: #888888;
+    font-size: 10px;
+}
+
+.pemdash .angle-unit.selected {
+    color: #eeeeee;
+}
+
+.pemdash switch.angle-switch,
+.pemdash switch.angle-switch:checked {
+    min-width: 36px;
+    min-height: 18px;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    background: #333333;
+    box-shadow: none;
+}
+
+.pemdash switch.angle-switch slider {
+    min-width: 14px;
+    min-height: 14px;
+    margin: 2px;
+    border: none;
+    border-radius: 999px;
+    background: #eeeeee;
+    box-shadow: none;
+}
+
+.pemdash switch.angle-switch image {
+    opacity: 0;
 }
 
 popover.reference-popover > arrow {
-    background: #24222b;
-    border-color: #46404f;
+    background: #242424;
+    border-color: #464646;
 }
 
 popover.reference-popover > contents {
-    border: 1px solid #46404f;
-    border-radius: 12px;
-    background: #24222b;
-    color: #eeeef4;
+    border: 1px solid #464646;
+    border-radius: 0;
+    background: #242424;
+    color: #eeeeee;
     box-shadow: 0 8px 24px alpha(#000000, 0.3);
 }
 
@@ -254,27 +274,27 @@ popover.reference-popover > contents {
 }
 
 .reference-heading {
-    color: #d3baff;
+    color: #dddddd;
     font-size: 12px;
     font-weight: 700;
 }
 
 .reference-detail {
-    color: #c2becd;
+    color: #c2c2c2;
     font-size: 12px;
 }
 
 button.example {
     padding: 6px 10px;
-    border: 1px solid #544760;
-    border-radius: 6px;
-    background: #342c40;
+    border: 1px solid #505050;
+    border-radius: 0;
+    background: #303030;
     box-shadow: none;
-    color: #e0ccff;
+    color: #e5e5e5;
     font-family: monospace;
     font-size: 12px;
 }
 
 button.example:hover {
-    background: #463752;
+    background: #404040;
 }

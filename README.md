@@ -33,7 +33,7 @@ A compact dark overlay with a focused expression field, live result card, and ke
 - `Escape` closes pemdash, including when another control has focus.
 - `Copy` copies a valid result without closing. It is disabled for empty or invalid input, and confirms when a result has been copied.
 - The clear icon resets the expression. The help button opens a function reference with clickable examples.
-- Click `RAD` / `DEG` in the footer to switch between radians and degrees. The current expression recalculates immediately. Each launch starts in `RAD`.
+- Use the `RAD` / `DEG` switch in the footer to select radians (left) or degrees (right). The current expression recalculates immediately. Each launch starts in `RAD`.
 - Drag the header to move the overlay, or use its close button.
 - Long results stay within the window; hover to see the full value, or copy it without truncation.
 

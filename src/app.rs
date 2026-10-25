@@ -7,12 +7,12 @@ use gtk4::glib::Propagation;
 use gtk4::prelude::{
     ApplicationExt, ApplicationExtManual, BoxExt, ButtonExt, Cast, EditableExt, EntryExt,
     EventControllerExt, GestureSingleExt, GtkApplicationExt, GtkWindowExt, NativeExt, ObjectExt,
-    PopoverExt, ToggleButtonExt, WidgetExt,
+    PopoverExt, WidgetExt,
 };
 use gtk4::{
     Align, Application, ApplicationWindow, Box as GtkBox, Button, CssProvider, Entry,
     EventControllerKey, GestureClick, Label, MenuButton, Orientation, Popover, PropagationPhase,
-    ToggleButton,
+    Switch,
 };
 const APP_ID: &str = "dev.pixelcluster.pemdash";
 
@@ -67,14 +67,27 @@ fn build_ui(app: &Application) {
         }
     });
 
-    let mode = ToggleButton::builder()
+    let mode = Switch::builder()
         .name("angle-mode")
-        .label("RAD")
+        .valign(Align::Center)
+        .tooltip_text("Angles use radians. Switch on to use degrees.")
+        .build();
+    mode.add_css_class("angle-switch");
+    let radians = Label::new(Some("RAD"));
+    radians.add_css_class("angle-unit");
+    radians.add_css_class("selected");
+    let degrees = Label::new(Some("DEG"));
+    degrees.add_css_class("angle-unit");
+    let angle_control = GtkBox::builder()
+        .orientation(Orientation::Horizontal)
+        .spacing(6)
         .hexpand(true)
         .halign(Align::End)
-        .tooltip_text("Angles use radians. Click to switch to degrees.")
         .build();
-    mode.add_css_class("mode");
+    angle_control.add_css_class("angle-control");
+    angle_control.append(&radians);
+    angle_control.append(&mode);
+    angle_control.append(&degrees);
 
     let header = GtkBox::new(Orientation::Horizontal, 10);
     header.add_css_class("header");
@@ -205,7 +218,7 @@ fn build_ui(app: &Application) {
         footer.append(&keycap);
         footer.append(&description);
     }
-    footer.append(&mode);
+    footer.append(&angle_control);
 
     let content = GtkBox::builder()
         .orientation(Orientation::Vertical)
@@ -243,13 +256,20 @@ fn build_ui(app: &Application) {
         let copy = copy.clone();
         let status = status.clone();
         let result_card = result_card.clone();
-        mode.connect_toggled(move |mode| {
+        mode.connect_active_notify(move |mode| {
             let selected = angle_mode(mode);
-            let (label, tooltip) = match selected {
-                AngleMode::Radians => ("RAD", "Angles use radians. Click to switch to degrees."),
-                AngleMode::Degrees => ("DEG", "Angles use degrees. Click to switch to radians."),
+            radians.remove_css_class("selected");
+            degrees.remove_css_class("selected");
+            let tooltip = match selected {
+                AngleMode::Radians => {
+                    radians.add_css_class("selected");
+                    "Angles use radians. Switch on to use degrees."
+                }
+                AngleMode::Degrees => {
+                    degrees.add_css_class("selected");
+                    "Angles use degrees. Switch off to use radians."
+                }
             };
-            mode.set_label(label);
             mode.set_tooltip_text(Some(tooltip));
             if let Some(input) = input.upgrade() {
                 refresh_result(&input, &result, &copy, &status, &result_card, selected);
@@ -329,8 +349,8 @@ fn build_ui(app: &Application) {
     input.grab_focus();
 }
 
-fn angle_mode(button: &ToggleButton) -> AngleMode {
-    if button.is_active() {
+fn angle_mode(switch: &Switch) -> AngleMode {
+    if switch.is_active() {
         AngleMode::Degrees
     } else {
         AngleMode::Radians
@@ -652,13 +672,16 @@ mod tests {
         input.emit_activate();
         assert!(window.is_visible());
 
-        let mode = find_widget::<ToggleButton>(&window, "angle-mode");
-        assert_eq!(mode.label().as_deref(), Some("RAD"));
+        let mode = find_widget::<Switch>(&window, "angle-mode");
+        let radians = mode.prev_sibling().expect("Switch has a RAD label");
+        let degrees = mode.next_sibling().expect("Switch has a DEG label");
+        assert!(radians.has_css_class("selected"), "RAD starts selected");
         assert!(!mode.is_active());
         input.set_text("sin(90)");
         let radians_result = result.text();
-        mode.emit_clicked();
-        assert_eq!(mode.label().as_deref(), Some("DEG"));
+        mode.set_active(true);
+        assert!(degrees.has_css_class("selected"), "DEG becomes selected");
+        assert!(!radians.has_css_class("selected"), "RAD becomes inactive");
         assert_eq!(input.text(), "sin(90)");
         assert_eq!(result.text(), "= 1");
         copy.emit_clicked();
@@ -674,8 +697,9 @@ mod tests {
             .downcast::<Button>()
             .expect("Example is a button");
         assert_eq!(trig_example.label().as_deref(), Some("sin(90)"));
-        mode.emit_clicked();
-        assert_eq!(mode.label().as_deref(), Some("RAD"));
+        mode.set_active(false);
+        assert!(radians.has_css_class("selected"), "RAD becomes selected");
+        assert!(!degrees.has_css_class("selected"), "DEG becomes inactive");
         assert_eq!(result.text(), radians_result);
         assert_eq!(copy.label().as_deref(), Some("Copy"));
         assert!(!copy.has_css_class("copied"));
@@ -762,9 +786,9 @@ mod tests {
         assert!(!window.is_visible());
 
         let (window, input, result, _, _) = widgets();
-        let mode = find_widget::<ToggleButton>(&window, "angle-mode");
-        assert_eq!(mode.label().as_deref(), Some("RAD"));
-        mode.emit_clicked();
+        let mode = find_widget::<Switch>(&window, "angle-mode");
+        assert!(!mode.is_active(), "New windows default to radians");
+        mode.set_active(true);
         assert_eq!(result.text(), "Enter an expression");
         input.set_text("asin(1)");
         assert_eq!(result.text(), "= 90");
