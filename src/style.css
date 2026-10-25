@@ -11,28 +11,10 @@ window.pemdash {
     padding: 20px 24px 18px;
 }
 
-.pemdash .brand-mark {
-    min-width: 30px;
-    min-height: 30px;
-    border: 1px solid #4c4c4c;
-    border-radius: 0;
-    background: #282828;
-    color: #dddddd;
-    font-family: monospace;
-    font-size: 22px;
-    font-weight: 700;
-}
-
 .pemdash .brand-name {
     font-size: 16px;
     font-weight: 700;
     letter-spacing: -0.4px;
-}
-
-.pemdash .subtitle {
-    margin-left: 6px;
-    color: #a3a3a3;
-    font-size: 12px;
 }
 
 .pemdash button.quiet-button,

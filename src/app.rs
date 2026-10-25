@@ -97,16 +97,8 @@ fn build_ui(app: &Application) {
         .spacing(10)
         .hexpand(true)
         .build();
-    let mark = Label::new(Some("="));
-    mark.add_css_class("brand-mark");
     let title = Label::new(Some("pemdash"));
     title.add_css_class("brand-name");
-    let subtitle = Label::builder()
-        .label("A little space to think.")
-        .halign(Align::Start)
-        .hexpand(true)
-        .build();
-    subtitle.add_css_class("subtitle");
     let help = MenuButton::builder()
         .name("help")
         .icon_name("help-about-symbolic")
@@ -128,9 +120,7 @@ fn build_ui(app: &Application) {
             }
         });
     }
-    drag_area.append(&mark);
     drag_area.append(&title);
-    drag_area.append(&subtitle);
     header.append(&drag_area);
     header.append(&help);
     header.append(&close);
@@ -651,6 +641,16 @@ mod tests {
         };
         let (window, input, result, copy, status) = widgets();
         let drag_area = find_widget::<GtkBox>(&window, "header-drag-area");
+        let title = drag_area
+            .first_child()
+            .expect("Header includes the app name")
+            .downcast::<Label>()
+            .expect("The app name is a label");
+        assert_eq!(title.text(), "pemdash");
+        assert!(
+            title.next_sibling().is_none(),
+            "Header has no logo or tagline"
+        );
         let help = find_widget::<MenuButton>(&window, "help");
         let close = find_widget::<Button>(&window, "close");
         assert_eq!(drag_area.parent(), help.parent());
