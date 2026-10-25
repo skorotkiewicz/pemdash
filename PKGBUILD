@@ -7,6 +7,8 @@ arch=('x86_64' 'aarch64')
 url="https://github.com/skorotkiewicz/pemdash"
 license=('MIT')
 depends=('gcc-libs' 'gtk4')
+optdepends=('wl-clipboard: persistent clipboard copying on Wayland'
+            'xclip: persistent clipboard copying on X11')
 makedepends=()
 options=(!strip)
 

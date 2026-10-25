@@ -10,6 +10,15 @@ A small calculator overlay with proper operator precedence.
 yay -S pemdash
 ```
 
+Install the clipboard helper for your session (one is enough):
+
+```bash
+sudo pacman -S wl-clipboard # Wayland, including niri
+sudo pacman -S xclip        # X11
+```
+
+These helpers keep copied results available after pemdash exits; a clipboard manager is not required.
+
 ## Use
 
 ```bash
@@ -20,7 +29,7 @@ Type an expression. The result updates as you type.
 
 A compact dark overlay with a focused expression field, live result card, and keyboard-first controls. The footer shows `Enter` to copy a valid result and close, and `Esc` to close.
 
-- `Enter` in the expression field copies a valid result and closes pemdash. Empty or invalid input leaves the window open and does not copy an earlier result.
+- `Enter` in the expression field copies a valid result and closes pemdash only after the clipboard helper succeeds. Empty or invalid input leaves the window open and does not copy an earlier result. If copying fails, the window stays open with a `Copy failed` status (hover for details) and a `Retry` button.
 - `Escape` closes pemdash, including when another control has focus.
 - `Copy` copies a valid result without closing. It is disabled for empty or invalid input, and confirms when a result has been copied.
 - The clear icon resets the expression. The help button opens a function reference with clickable examples.

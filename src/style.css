@@ -128,7 +128,8 @@ window.pemdash {
     color: #c4acdf;
 }
 
-.pemdash .invalid .status {
+.pemdash .invalid .status,
+.pemdash .status.error {
     color: #f0a4af;
 }
 
