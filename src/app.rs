@@ -45,7 +45,6 @@ fn build_ui(app: &Application) {
         .application(app)
         .title("pemdash")
         .default_width(720)
-        .default_height(300)
         .decorated(false)
         .resizable(false)
         .build();
@@ -89,41 +88,21 @@ fn build_ui(app: &Application) {
     angle_control.append(&mode);
     angle_control.append(&degrees);
 
-    let header = GtkBox::new(Orientation::Horizontal, 10);
-    header.add_css_class("header");
     let drag_area = GtkBox::builder()
-        .name("header-drag-area")
+        .name("expression-drag-area")
         .orientation(Orientation::Horizontal)
-        .spacing(10)
         .hexpand(true)
+        .tooltip_text("Drag to move")
         .build();
-    let title = Label::new(Some("pemdash"));
-    title.add_css_class("brand-name");
+    drag_area.set_cursor_from_name(Some("move"));
     let help = MenuButton::builder()
         .name("help")
-        .icon_name("help-about-symbolic")
-        .tooltip_text("Functions and examples")
+        .label("F1")
+        .direction(gtk4::ArrowType::None)
+        .tooltip_text("Functions and examples (F1)")
         .popover(&reference_popover(&input, AngleMode::Radians))
         .build();
-    help.add_css_class("quiet-button");
-    let close = Button::builder()
-        .name("close")
-        .icon_name("window-close-symbolic")
-        .tooltip_text("Close (Esc)")
-        .build();
-    close.add_css_class("quiet-button");
-    {
-        let window = window.downgrade();
-        close.connect_clicked(move |_| {
-            if let Some(window) = window.upgrade() {
-                window.close();
-            }
-        });
-    }
-    drag_area.append(&title);
-    header.append(&drag_area);
-    header.append(&help);
-    header.append(&close);
+    help.add_css_class("help-shortcut");
 
     let drag = GestureClick::new();
     drag.set_button(1);
@@ -150,8 +129,9 @@ fn build_ui(app: &Application) {
         .halign(Align::Start)
         .build();
     expression_heading.add_css_class("eyebrow");
+    drag_area.append(&expression_heading);
     let expression_section = GtkBox::new(Orientation::Vertical, 8);
-    expression_section.append(&expression_heading);
+    expression_section.append(&drag_area);
     expression_section.append(&input);
 
     let result = Label::builder()
@@ -199,7 +179,9 @@ fn build_ui(app: &Application) {
     let footer = GtkBox::new(Orientation::Horizontal, 6);
     footer.add_css_class("footer");
     footer.set_widget_name("keyboard-hint");
-    footer.set_tooltip_text(Some("Enter: copy valid result and close   Esc: close"));
+    footer.set_tooltip_text(Some(
+        "Enter: copy valid result and close   Esc: close   F1: help",
+    ));
     for (key, action) in [("↵ Enter", "copy & close"), ("Esc", "close")] {
         let keycap = Label::new(Some(key));
         keycap.add_css_class("keycap");
@@ -208,6 +190,10 @@ fn build_ui(app: &Application) {
         footer.append(&keycap);
         footer.append(&description);
     }
+    let help_label = Label::new(Some("help"));
+    help_label.add_css_class("shortcut-description");
+    footer.append(&help);
+    footer.append(&help_label);
     footer.append(&angle_control);
 
     let content = GtkBox::builder()
@@ -215,7 +201,6 @@ fn build_ui(app: &Application) {
         .spacing(18)
         .build();
     content.add_css_class("content");
-    content.append(&header);
     content.append(&expression_section);
     content.append(&result_card);
     content.append(&footer);
@@ -322,15 +307,21 @@ fn build_ui(app: &Application) {
     keys.set_propagation_phase(PropagationPhase::Capture);
     {
         let window = window.downgrade();
-        keys.connect_key_pressed(move |_, key, _, _| {
-            if key == gdk::Key::Escape {
+        let help = help.downgrade();
+        keys.connect_key_pressed(move |_, key, _, _| match key {
+            gdk::Key::Escape => {
                 if let Some(window) = window.upgrade() {
                     window.close();
                 }
                 Propagation::Stop
-            } else {
-                Propagation::Proceed
             }
+            gdk::Key::F1 => {
+                if let Some(help) = help.upgrade() {
+                    help.popup();
+                }
+                Propagation::Stop
+            }
+            _ => Propagation::Proceed,
         });
     }
     window.add_controller(keys);
@@ -455,6 +446,16 @@ fn copy_result(
 fn reference_popover(input: &Entry, mode: AngleMode) -> Popover {
     let popover = Popover::new();
     popover.add_css_class("reference-popover");
+    {
+        let input = input.downgrade();
+        popover.connect_closed(move |_| {
+            if let Some(input) = input.upgrade() {
+                gtk4::glib::idle_add_local_once(move || {
+                    input.grab_focus();
+                });
+            }
+        });
+    }
     let content = GtkBox::new(Orientation::Vertical, 12);
     content.add_css_class("reference-content");
     let title = Label::builder()
@@ -640,21 +641,19 @@ mod tests {
             });
         };
         let (window, input, result, copy, status) = widgets();
-        let drag_area = find_widget::<GtkBox>(&window, "header-drag-area");
-        let title = drag_area
+        let drag_area = find_widget::<GtkBox>(&window, "expression-drag-area");
+        let heading = drag_area
             .first_child()
-            .expect("Header includes the app name")
+            .expect("Drag strip includes the expression heading")
             .downcast::<Label>()
-            .expect("The app name is a label");
-        assert_eq!(title.text(), "pemdash");
+            .expect("The expression heading is a label");
+        assert_eq!(heading.text(), "EXPRESSION");
         assert!(
-            title.next_sibling().is_none(),
-            "Header has no logo or tagline"
+            heading.next_sibling().is_none(),
+            "Drag strip has no controls"
         );
         let help = find_widget::<MenuButton>(&window, "help");
-        let close = find_widget::<Button>(&window, "close");
-        assert_eq!(drag_area.parent(), help.parent());
-        assert_eq!(drag_area.parent(), close.parent());
+        assert_eq!(drag_area.parent(), input.parent());
         let controllers = drag_area.observe_controllers();
         assert!((0..controllers.n_items()).any(|i| {
             controllers
@@ -662,9 +661,10 @@ mod tests {
                 .is_some_and(|item| item.is::<GestureClick>())
         }));
         let hint = find_widget::<GtkBox>(&window, "keyboard-hint");
+        assert_eq!(help.parent().as_ref(), Some(hint.upcast_ref()));
         assert_eq!(
             hint.tooltip_text().as_deref(),
-            Some("Enter: copy valid result and close   Esc: close")
+            Some("Enter: copy valid result and close   Esc: close   F1: help")
         );
         assert_eq!(status.text(), "Ready when you are");
         assert!(result.has_css_class("empty"));
@@ -782,6 +782,23 @@ mod tests {
         };
         assert!(!emit_key(gdk::Key::a));
         assert!(window.is_visible());
+        let help = find_widget::<MenuButton>(&window, "help");
+        let reference = help.popover().expect("Footer help has a reference popover");
+        assert!(
+            emit_key(gdk::Key::F1),
+            "F1 is handled even with button focus"
+        );
+        assert!(reference.is_visible(), "F1 opens the function reference");
+        reference.popdown();
+        gtk4::glib::MainContext::default().block_on(gtk4::glib::timeout_future(
+            std::time::Duration::from_millis(20),
+        ));
+        let focus =
+            gtk4::prelude::RootExt::focus(&window).expect("Closing help restores keyboard focus");
+        assert!(
+            focus.eq(input.upcast_ref::<gtk4::Widget>()) || focus.is_ancestor(&input),
+            "Closing help returns focus to the expression"
+        );
         assert!(emit_key(gdk::Key::Escape));
         assert!(!window.is_visible());
 
@@ -796,10 +813,6 @@ mod tests {
         wait_for_copy(&window);
         assert!(!window.is_visible());
         assert_eq!(clipboard_text().as_deref(), Some("90"));
-
-        let (window, _, _, _, _) = widgets();
-        find_widget::<Button>(&window, "close").emit_clicked();
-        assert!(!window.is_visible());
     }
 
     #[test]

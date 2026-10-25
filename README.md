@@ -27,14 +27,14 @@ cargo run --release
 
 Type an expression. The result updates as you type.
 
-A compact dark overlay with a focused expression field, live result card, and keyboard-first controls. The footer shows `Enter` to copy a valid result and close, and `Esc` to close.
+A compact, headerless dark overlay with a focused expression field, live result card, and keyboard-first controls. The footer shows `Enter` to copy a valid result and close, `Esc` to close, and `F1` for help.
 
 - `Enter` in the expression field copies a valid result and closes pemdash only after the clipboard helper succeeds. Empty or invalid input leaves the window open and does not copy an earlier result. If copying fails, the window stays open with a `Copy failed` status (hover for details) and a `Retry` button.
 - `Escape` closes pemdash, including when another control has focus.
 - `Copy` copies a valid result without closing. It is disabled for empty or invalid input, and confirms when a result has been copied.
-- The clear icon resets the expression. The help button opens a function reference with clickable examples.
+- The clear icon resets the expression. Press `F1` or click the footer's `F1 help` control for a function reference with clickable examples.
 - Use the `RAD` / `DEG` switch in the footer to select radians (left) or degrees (right). The current expression recalculates immediately. Each launch starts in `RAD`.
-- Drag the header to move the overlay, or use its close button.
+- Drag the `EXPRESSION` strip above the input to move the overlay.
 - Long results stay within the window; hover to see the full value, or copy it without truncation.
 
 ## Calculation rules

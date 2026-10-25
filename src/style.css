@@ -11,28 +11,15 @@ window.pemdash {
     padding: 20px 24px 18px;
 }
 
-.pemdash .brand-name {
-    font-size: 16px;
-    font-weight: 700;
-    letter-spacing: -0.4px;
-}
-
-.pemdash button.quiet-button,
-.pemdash menubutton.quiet-button > button {
-    min-width: 28px;
-    min-height: 28px;
-    padding: 2px;
-    border: 1px solid transparent;
-    border-radius: 0;
-    background: transparent;
+.pemdash menubutton.help-shortcut > button {
+    min-width: 0;
+    min-height: 0;
     box-shadow: none;
-    color: #a3a3a3;
 }
 
-.pemdash button.quiet-button:hover,
-.pemdash menubutton.quiet-button > button:hover,
-.pemdash menubutton.quiet-button > button:checked {
-    background: #2c2c2c;
+.pemdash menubutton.help-shortcut > button:hover,
+.pemdash menubutton.help-shortcut > button:checked {
+    border-color: #999999;
     color: #eeeeee;
 }
 
@@ -178,7 +165,8 @@ window.pemdash {
     outline-offset: 3px;
 }
 
-.pemdash .keycap {
+.pemdash .keycap,
+.pemdash menubutton.help-shortcut > button {
     padding: 3px 6px;
     border: 1px solid #464646;
     border-bottom-width: 2px;
