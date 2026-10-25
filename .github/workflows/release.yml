@@ -2,7 +2,9 @@ name: Release pemdash
 
 on:
   push:
+    branches: [main, dev]
     tags: ['v*']
+  pull_request:
   workflow_dispatch:
 
 env:
@@ -10,58 +12,103 @@ env:
 
 jobs:
   build:
-    name: ${{ matrix.target }}
+    name: Build and test (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    env:
+      # Keep tag release filenames unchanged; PR refs contain slashes.
+      ARCHIVE_NAME: pemdash-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || github.sha }}-${{ matrix.target }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { target: x86_64-unknown-linux-gnu,  os: ubuntu-latest    }
-          - { target: aarch64-unknown-linux-gnu, os: ubuntu-24.04-arm }
+          - { target: x86_64-unknown-linux-gnu,  os: ubuntu-latest,    shell: bash }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-24.04-arm, shell: bash }
+          - { target: aarch64-apple-darwin,      os: macos-15,         shell: bash }
+          - { target: x86_64-apple-darwin,       os: macos-15-intel,   shell: bash }
+          - { target: x86_64-pc-windows-gnu,     os: windows-latest,   shell: 'msys2 {0}' }
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install GTK 4
-        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev
+      - name: Install GTK 4 (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev pkg-config
+
+      - name: Install GTK 4 (macOS)
+        if: runner.os == 'macOS'
+        run: brew install gtk4 pkgconf
+
+      # Use one consistent UCRT64 toolchain for Rust, GTK, and the linker.
+      # This ZIP requires the matching MSYS2 runtime; it is not standalone.
+      - name: Install Rust and GTK 4 (Windows / MSYS2 UCRT64)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          path-type: minimal
+          install: >-
+            mingw-w64-ucrt-x86_64-rust
+            mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-gcc
 
       - uses: dtolnay/rust-toolchain@stable
+        if: runner.os != 'Windows'
         with:
           targets: ${{ matrix.target }}
 
       - uses: Swatinem/rust-cache@v2
+        if: runner.os != 'Windows'
+
+      - name: Check native toolchain and GTK
+        run: |
+          rustc -vV
+          rustc -vV | grep -Fx 'host: ${{ matrix.target }}'
+          pkg-config --modversion gtk4
+
+      # GTK is linked, but ordinary unit/doc tests do not initialize a display.
+      # The existing ignored GUI test remains opt-in (no --include-ignored).
+      - name: Test without a graphical display
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            # Clipboard subprocess fixtures need Windows PowerShell even when
+            # MSYS2's minimal PATH omits its directory. Keep UCRT64 first.
+            powershell_dir="$(cygpath -u "${SYSTEMROOT:-$SystemRoot}")/System32/WindowsPowerShell/v1.0"
+            test -x "$powershell_dir/powershell.exe"
+            export PATH="$PATH:$powershell_dir"
+            command -v powershell.exe
+          fi
+          cargo test --locked --all-features --target ${{ matrix.target }}
 
       - run: cargo build --release --locked --all-features --target ${{ matrix.target }}
 
-      - name: Package
+      - name: Package Unix binary (system GTK required)
+        if: runner.os != 'Windows'
         run: |
           mkdir dist
           cp target/${{ matrix.target }}/release/pemdash dist/pemdash
           cp README.md dist/README.md
           cp LICENSE dist/LICENSE
-          tar -C dist -czf pemdash-${{ github.ref_name }}-${{ matrix.target }}.tar.gz pemdash README.md LICENSE
+          tar -C dist -czf "$ARCHIVE_NAME.tar.gz" pemdash README.md LICENSE
+
+      - name: Package Windows binary (MSYS2 UCRT64 required)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item target/${{ matrix.target }}/release/pemdash.exe dist/pemdash.exe
+          Copy-Item README.md, LICENSE dist/
+          Compress-Archive -Path dist/* -DestinationPath "$env:ARCHIVE_NAME.zip"
 
       - uses: actions/upload-artifact@v4
         with:
           name: pemdash-${{ matrix.target }}
-          path: pemdash-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+          path: ${{ env.ARCHIVE_NAME }}.*
           if-no-files-found: error
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install GTK 4
-        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
-      - run: cargo test --locked --all-features
 
   check:
     name: Code quality
@@ -84,7 +131,7 @@ jobs:
 
   release:
     name: Release
-    needs: [build, test, check]
+    needs: [build, check]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:

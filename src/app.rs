@@ -524,7 +524,19 @@ mod tests {
             let command: &[&str] = match display.type_().name() {
                 "GdkWaylandDisplay" => &["wl-paste", "--no-newline"],
                 "GdkX11Display" => &["xclip", "-selection", "clipboard", "-out"],
-                _ => panic!("Clipboard test requires Wayland or X11"),
+                "GdkMacosDisplay" => &["/usr/bin/pbpaste"],
+                "GdkWin32Display" => &[
+                    "powershell.exe",
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-STA",
+                    "-Command",
+                    "$ErrorActionPreference = 'Stop'; \
+                     [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); \
+                     [Console]::Write((Get-Clipboard -Raw))",
+                ],
+                _ => panic!("Clipboard test requires Linux, macOS, or Windows"),
             };
             // An external reader also works when the test window has no
             // keyboard focus (required for GTK clipboard reads on Wayland).

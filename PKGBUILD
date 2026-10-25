@@ -10,7 +10,7 @@ depends=('gcc-libs' 'gtk4')
 optdepends=('wl-clipboard: persistent clipboard copying on Wayland'
             'xclip: persistent clipboard copying on X11')
 makedepends=()
-options=(!strip)
+options=('!strip' '!debug' '!lto')
 
 source_x86_64=("$pkgname-$pkgver-$pkgrel-x86_64.tar.gz::$url/releases/download/v$pkgver/pemdash-v$pkgver-x86_64-unknown-linux-gnu.tar.gz")
 source_aarch64=("$pkgname-$pkgver-$pkgrel-aarch64.tar.gz::$url/releases/download/v$pkgver/pemdash-v$pkgver-aarch64-unknown-linux-gnu.tar.gz")
