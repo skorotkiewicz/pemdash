@@ -49,3 +49,15 @@ remove-tag VERSION="":
     [ -z "$tag" ] && echo "No tag selected" && exit 1
     git tag -d "$tag"
     git push --delete origin "$tag"
+
+# Undo last commit locally and on remote, keeping changes staged.
+undo-commit:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}')
+    remote="${upstream%%/*}"
+    branch="${upstream#*/}"
+
+    git reset --soft HEAD~1
+    git push --force-with-lease "$remote" "HEAD:$branch"

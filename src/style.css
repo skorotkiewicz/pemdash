@@ -1,0 +1,267 @@
+window.pemdash {
+    background: #17171c;
+    color: #eeeef4;
+    border: 1px solid #393841;
+    border-radius: 18px;
+    font-family: "Inter", "Cantarell", sans-serif;
+    font-size: 13px;
+}
+
+.pemdash .content {
+    padding: 20px 24px 18px;
+}
+
+.pemdash .brand-mark {
+    min-width: 30px;
+    min-height: 30px;
+    border: 1px solid #51456e;
+    border-radius: 9px;
+    background: #30283f;
+    color: #d3baff;
+    font-family: monospace;
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.pemdash .brand-name {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.4px;
+}
+
+.pemdash .subtitle {
+    margin-left: 6px;
+    color: #a3a1ae;
+    font-size: 12px;
+}
+
+.pemdash button.quiet-button,
+.pemdash menubutton.quiet-button > button {
+    min-width: 28px;
+    min-height: 28px;
+    padding: 2px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    box-shadow: none;
+    color: #a3a1ae;
+}
+
+.pemdash button.quiet-button:hover,
+.pemdash menubutton.quiet-button > button:hover,
+.pemdash menubutton.quiet-button > button:checked {
+    background: #2b2933;
+    color: #eeeef4;
+}
+
+.pemdash .eyebrow {
+    color: #aaa7b8;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.6px;
+}
+
+.pemdash entry.expression {
+    min-height: 50px;
+    padding: 0 14px;
+    border: 1px solid #44414f;
+    border-radius: 10px;
+    background: #202027;
+    box-shadow: none;
+    color: #f4f1ff;
+    caret-color: #ccb0ff;
+    font-family: "JetBrains Mono", "DejaVu Sans Mono", monospace;
+    font-size: 19px;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.pemdash entry.expression:focus-within {
+    border-color: #b49ae6;
+    box-shadow: 0 0 0 3px alpha(#b49ae6, 0.12);
+}
+
+.pemdash entry.expression image {
+    color: #b49ae6;
+    margin-right: 10px;
+    -gtk-icon-size: 18px;
+}
+
+.pemdash entry.expression image.right {
+    margin-right: 0;
+    margin-left: 10px;
+    color: #aaa7b8;
+}
+
+.pemdash entry.expression text placeholder {
+    color: #a3a1ae;
+    opacity: 1;
+}
+
+.pemdash entry.expression selection,
+.pemdash label.result selection {
+    background: #574572;
+    color: #ffffff;
+}
+
+.pemdash .result-card {
+    padding: 14px 16px;
+    border: 1px solid #34323d;
+    border-radius: 12px;
+    background: #1e1d25;
+    transition: border-color 150ms ease;
+}
+
+.pemdash .result-card.valid {
+    border-color: #514265;
+}
+
+.pemdash .result-card.invalid {
+    border-color: #7d4a53;
+}
+
+.pemdash .status {
+    color: #a3a1ae;
+    font-size: 11px;
+}
+
+.pemdash .valid .status {
+    color: #c4acdf;
+}
+
+.pemdash .invalid .status,
+.pemdash .status.error {
+    color: #f0a4af;
+}
+
+.pemdash label.result {
+    min-height: 42px;
+    color: #e0ccff;
+    font-family: "JetBrains Mono", "DejaVu Sans Mono", monospace;
+    font-size: 30px;
+    font-weight: 500;
+}
+
+.pemdash label.result.empty {
+    color: #aaa7b8;
+    font-family: "Inter", "Cantarell", sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+}
+
+.pemdash label.result.error {
+    color: #f0a4af;
+    font-family: "Inter", "Cantarell", sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+}
+
+.pemdash button.copy {
+    min-width: 66px;
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid #c1a4f1;
+    border-radius: 8px;
+    background: #c1a4f1;
+    box-shadow: none;
+    color: #21182f;
+    font-size: 12px;
+    font-weight: 700;
+    transition: background 150ms ease;
+}
+
+.pemdash button.copy:hover {
+    background: #d5baff;
+}
+
+.pemdash button.copy:active {
+    background: #ac8adf;
+}
+
+.pemdash button.copy:disabled {
+    border-color: #403a4a;
+    background: #302b39;
+    color: #a49aaf;
+}
+
+.pemdash button.copy.copied {
+    border-color: #96ceb5;
+    background: #96ceb5;
+    color: #172b21;
+}
+
+.pemdash button:focus-visible {
+    outline: 2px solid #d3baff;
+    outline-offset: 3px;
+}
+
+.pemdash .keycap {
+    padding: 3px 6px;
+    border: 1px solid #46424f;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    background: #24222b;
+    color: #c9c5d5;
+    font-size: 10px;
+}
+
+.pemdash .shortcut-description {
+    margin-right: 12px;
+    color: #aaa7b8;
+    font-size: 11px;
+}
+
+.pemdash .mode {
+    color: #aaa7b8;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+popover.reference-popover > arrow {
+    background: #24222b;
+    border-color: #46404f;
+}
+
+popover.reference-popover > contents {
+    border: 1px solid #46404f;
+    border-radius: 12px;
+    background: #24222b;
+    color: #eeeef4;
+    box-shadow: 0 8px 24px alpha(#000000, 0.3);
+}
+
+.reference-content {
+    padding: 12px;
+}
+
+.reference-title {
+    margin-bottom: 4px;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.reference-heading {
+    color: #d3baff;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.reference-detail {
+    color: #c2becd;
+    font-size: 12px;
+}
+
+button.example {
+    padding: 6px 10px;
+    border: 1px solid #544760;
+    border-radius: 6px;
+    background: #342c40;
+    box-shadow: none;
+    color: #e0ccff;
+    font-family: monospace;
+    font-size: 12px;
+}
+
+button.example:hover {
+    background: #463752;
+}
