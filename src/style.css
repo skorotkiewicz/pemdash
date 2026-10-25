@@ -210,11 +210,24 @@ window.pemdash {
     font-size: 11px;
 }
 
-.pemdash .mode {
+.pemdash button.mode {
+    min-width: 40px;
+    padding: 4px 8px;
+    border: 1px solid #46424f;
+    border-radius: 6px;
+    background: #24222b;
+    box-shadow: none;
     color: #aaa7b8;
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 1px;
+}
+
+.pemdash button.mode:hover,
+.pemdash button.mode:checked {
+    border-color: #b49ae6;
+    background: #342c40;
+    color: #e0ccff;
 }
 
 popover.reference-popover > arrow {

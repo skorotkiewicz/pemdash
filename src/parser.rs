@@ -1,5 +1,7 @@
 use std::f64::consts::{E, PI, TAU};
 
+use crate::AngleMode;
+
 #[derive(Clone, Debug, PartialEq)]
 enum Token {
     Number(f64),
@@ -11,6 +13,7 @@ enum Token {
 }
 
 /// Evaluates an expression using operator precedence and finite `f64` arithmetic.
+/// Trigonometric functions use radians.
 ///
 /// # Errors
 ///
@@ -24,6 +27,29 @@ enum Token {
 /// # Ok::<(), String>(())
 /// ```
 pub fn calculate(expression: &str) -> Result<f64, String> {
+    calculate_with_angle_mode(expression, AngleMode::Radians)
+}
+
+/// Evaluates an expression with the selected units for trigonometric functions.
+///
+/// `sin`, `cos`, and `tan` take angles in the selected units. `asin`, `acos`,
+/// `atan`, and `atan2` return angles in those units. Constants such as `pi`
+/// and all other functions are independent of the angle mode.
+///
+/// # Errors
+///
+/// Returns an error for invalid syntax, unknown names, incorrect argument
+/// counts, division by zero, or non-finite numeric literals and results.
+///
+/// # Examples
+///
+/// ```
+/// use pemdash::{AngleMode, calculate_with_angle_mode};
+///
+/// assert_eq!(calculate_with_angle_mode("sin(90)", AngleMode::Degrees)?, 1.0);
+/// # Ok::<(), String>(())
+/// ```
+pub fn calculate_with_angle_mode(expression: &str, angle_mode: AngleMode) -> Result<f64, String> {
     let expression = expression.trim();
     let expression = expression
         .strip_suffix('=')
@@ -38,6 +64,7 @@ pub fn calculate(expression: &str) -> Result<f64, String> {
     let mut parser = Parser {
         tokens,
         position: 0,
+        angle_mode,
     };
     let value = parser.parse_expression(0)?;
 
@@ -127,6 +154,7 @@ fn tokenize(expression: &str) -> Result<Vec<Token>, String> {
 struct Parser {
     tokens: Vec<Token>,
     position: usize,
+    angle_mode: AngleMode,
 }
 
 impl Parser {
@@ -179,7 +207,7 @@ impl Parser {
             Some(Token::Identifier(name)) if matches!(self.peek(), Some(Token::LeftParen)) => {
                 self.position += 1;
                 let arguments = self.parse_arguments()?;
-                apply_function(&name, &arguments)
+                apply_function(&name, &arguments, self.angle_mode)
             }
             Some(Token::Identifier(name)) => match name.as_str() {
                 "pi" => Ok(PI),
@@ -247,7 +275,7 @@ fn apply_operator(operator: char, left: f64, right: f64) -> Result<f64, String> 
     })
 }
 
-fn apply_function(name: &str, arguments: &[f64]) -> Result<f64, String> {
+fn apply_function(name: &str, arguments: &[f64], angle_mode: AngleMode) -> Result<f64, String> {
     let unary = |function: fn(f64) -> f64| match arguments {
         [value] => Ok(function(*value)),
         _ => Err(format!("{name} expects one argument")),
@@ -258,12 +286,20 @@ fn apply_function(name: &str, arguments: &[f64]) -> Result<f64, String> {
     };
 
     let value = match name {
-        "sin" => unary(f64::sin),
-        "cos" => unary(f64::cos),
-        "tan" => unary(f64::tan),
-        "asin" => unary(f64::asin),
-        "acos" => unary(f64::acos),
-        "atan" => unary(f64::atan),
+        "sin" | "cos" | "tan" => match arguments {
+            [angle] => {
+                let radians = angle_mode.input_radians(*angle);
+                Ok(match name {
+                    "sin" => radians.sin(),
+                    "cos" => radians.cos(),
+                    _ => radians.tan(),
+                })
+            }
+            _ => Err(format!("{name} expects one argument")),
+        },
+        "asin" => unary(f64::asin).map(|value| angle_mode.output_angle(value)),
+        "acos" => unary(f64::acos).map(|value| angle_mode.output_angle(value)),
+        "atan" => unary(f64::atan).map(|value| angle_mode.output_angle(value)),
         "sqrt" => unary(f64::sqrt),
         "abs" => unary(f64::abs),
         "exp" => unary(f64::exp),
@@ -273,7 +309,7 @@ fn apply_function(name: &str, arguments: &[f64]) -> Result<f64, String> {
         "ceil" => unary(f64::ceil),
         "round" => unary(f64::round),
         "pow" => binary(f64::powf),
-        "atan2" => binary(f64::atan2),
+        "atan2" => binary(f64::atan2).map(|value| angle_mode.output_angle(value)),
         "min" if !arguments.is_empty() => {
             Ok(arguments.iter().copied().fold(f64::INFINITY, f64::min))
         }
@@ -305,7 +341,8 @@ fn token_name(token: &Token) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use super::calculate;
+    use super::{calculate, calculate_with_angle_mode};
+    use crate::AngleMode;
     use std::f64::consts::PI;
 
     fn assert_close(actual: f64, expected: f64) {
@@ -332,6 +369,80 @@ mod tests {
         assert_close(calculate("sqrt(9) + 1e2").unwrap(), 103.0);
         assert_close(calculate("max(2, 8, 3) - min(2, 8, 3)").unwrap(), 6.0);
         assert_close(calculate("tau / 2").unwrap(), PI);
+    }
+
+    #[test]
+    fn evaluates_trigonometry_in_selected_units() {
+        for (radians, degrees, expected) in [
+            ("sin(pi / 2)", "sin(90)", 1.0),
+            ("cos(pi)", "cos(180)", -1.0),
+            ("tan(pi / 4)", "tan(45)", 1.0),
+            ("sin(-pi / 2)", "sin(-90)", -1.0),
+            ("sin(5 * pi / 2)", "sin(450)", 1.0),
+            ("sin(acos(0))", "sin(acos(0))", 1.0),
+            ("cos(atan2(1, 0))", "cos(atan2(1, 0))", 0.0),
+        ] {
+            assert_close(
+                calculate_with_angle_mode(radians, AngleMode::Radians)
+                    .expect("Valid radians expression"),
+                expected,
+            );
+            assert_close(
+                calculate_with_angle_mode(degrees, AngleMode::Degrees)
+                    .expect("Valid degrees expression"),
+                expected,
+            );
+        }
+    }
+
+    #[test]
+    fn returns_inverse_trigonometric_angles_in_selected_units() {
+        for (expression, degrees) in [
+            ("asin(1)", 90.0_f64),
+            ("acos(-1)", 180.0),
+            ("atan(1)", 45.0),
+            ("atan2(1, -1)", 135.0),
+            ("atan2(-1, -1)", -135.0),
+        ] {
+            assert_close(
+                calculate_with_angle_mode(expression, AngleMode::Radians)
+                    .expect("Valid inverse trigonometric expression"),
+                degrees.to_radians(),
+            );
+            assert_close(
+                calculate_with_angle_mode(expression, AngleMode::Degrees)
+                    .expect("Valid inverse trigonometric expression"),
+                degrees,
+            );
+        }
+    }
+
+    #[test]
+    fn angle_mode_preserves_constants_arithmetic_and_errors() {
+        for expression in ["pi", "tau", "e", "sqrt(144) + pow(2, 3)", "-2^2"] {
+            assert_eq!(
+                calculate_with_angle_mode(expression, AngleMode::Degrees),
+                calculate(expression),
+                "Angle mode must not change {expression}"
+            );
+        }
+        for expression in [
+            "sin()",
+            "cos(1, 2)",
+            "tan()",
+            "asin(2)",
+            "acos(-2)",
+            "atan2(1)",
+        ] {
+            assert!(
+                calculate_with_angle_mode(expression, AngleMode::Degrees).is_err(),
+                "Invalid expression must still fail in degree mode: {expression}"
+            );
+        }
+        assert_close(
+            calculate("sin(90)").expect("Default mode accepts radians"),
+            90.0_f64.sin(),
+        );
     }
 
     #[test]

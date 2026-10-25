@@ -33,7 +33,8 @@ A compact dark overlay with a focused expression field, live result card, and ke
 - `Escape` closes pemdash, including when another control has focus.
 - `Copy` copies a valid result without closing. It is disabled for empty or invalid input, and confirms when a result has been copied.
 - The clear icon resets the expression. The help button opens a function reference with clickable examples.
-- Drag the header to move the overlay, or use its close button. `RAD` indicates that angles use radians.
+- Click `RAD` / `DEG` in the footer to switch between radians and degrees. The current expression recalculates immediately. Each launch starts in `RAD`.
+- Drag the header to move the overlay, or use its close button.
 - Long results stay within the window; hover to see the full value, or copy it without truncation.
 
 ## Calculation rules
@@ -49,9 +50,9 @@ Supported operators are `+`, `-`, `*`, `/`, and `^`. Constants are `pi`, `e`, an
 
 | Functions | Arguments and behavior |
 | --- | --- |
-| `sin`, `cos`, `tan` | One angle in radians |
-| `asin`, `acos`, `atan` | One value, returning an angle in radians |
-| `atan2(y, x)` | Two values, returning an angle in radians |
+| `sin`, `cos`, `tan` | One angle in the selected RAD / DEG mode |
+| `asin`, `acos`, `atan` | One value, returning an angle in the selected mode |
+| `atan2(y, x)` | Two values, returning an angle in the selected mode |
 | `sqrt`, `abs`, `exp`, `ln`, `log10` | One value; `ln` is the natural logarithm |
 | `floor`, `ceil`, `round` | One value; `round` rounds halfway cases away from zero |
 | `pow(base, exponent)` | Two values, equivalent to `base ^ exponent` |

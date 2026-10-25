@@ -1,4 +1,5 @@
 use crate::clipboard_helper::ClipboardHelper;
+use crate::{AngleMode, calculate_with_angle_mode};
 
 use gtk4::gdk;
 use gtk4::gdk::prelude::ToplevelExt;
@@ -6,11 +7,12 @@ use gtk4::glib::Propagation;
 use gtk4::prelude::{
     ApplicationExt, ApplicationExtManual, BoxExt, ButtonExt, Cast, EditableExt, EntryExt,
     EventControllerExt, GestureSingleExt, GtkApplicationExt, GtkWindowExt, NativeExt, ObjectExt,
-    PopoverExt, WidgetExt,
+    PopoverExt, ToggleButtonExt, WidgetExt,
 };
 use gtk4::{
     Align, Application, ApplicationWindow, Box as GtkBox, Button, CssProvider, Entry,
     EventControllerKey, GestureClick, Label, MenuButton, Orientation, Popover, PropagationPhase,
+    ToggleButton,
 };
 const APP_ID: &str = "dev.pixelcluster.pemdash";
 
@@ -65,6 +67,15 @@ fn build_ui(app: &Application) {
         }
     });
 
+    let mode = ToggleButton::builder()
+        .name("angle-mode")
+        .label("RAD")
+        .hexpand(true)
+        .halign(Align::End)
+        .tooltip_text("Angles use radians. Click to switch to degrees.")
+        .build();
+    mode.add_css_class("mode");
+
     let header = GtkBox::new(Orientation::Horizontal, 10);
     header.add_css_class("header");
     let drag_area = GtkBox::builder()
@@ -87,7 +98,7 @@ fn build_ui(app: &Application) {
         .name("help")
         .icon_name("help-about-symbolic")
         .tooltip_text("Functions and examples")
-        .popover(&reference_popover(&input))
+        .popover(&reference_popover(&input, AngleMode::Radians))
         .build();
     help.add_css_class("quiet-button");
     let close = Button::builder()
@@ -194,14 +205,7 @@ fn build_ui(app: &Application) {
         footer.append(&keycap);
         footer.append(&description);
     }
-    let radians = Label::builder()
-        .label("RAD")
-        .hexpand(true)
-        .halign(Align::End)
-        .tooltip_text("Trigonometric functions use radians")
-        .build();
-    radians.add_css_class("mode");
-    footer.append(&radians);
+    footer.append(&mode);
 
     let content = GtkBox::builder()
         .orientation(Orientation::Vertical)
@@ -219,45 +223,40 @@ fn build_ui(app: &Application) {
         let copy = copy.clone();
         let status = status.clone();
         let result_card = result_card.clone();
+        let mode = mode.clone();
         input.connect_changed(move |input| {
-            result.remove_css_class("error");
-            result.remove_css_class("empty");
-            result_card.remove_css_class("invalid");
-            result_card.remove_css_class("valid");
-            result.set_tooltip_text(None);
-            copy.remove_css_class("copied");
-            copy.set_label("Copy");
-            status.remove_css_class("error");
-            status.set_tooltip_text(None);
+            refresh_result(
+                input,
+                &result,
+                &copy,
+                &status,
+                &result_card,
+                angle_mode(&mode),
+            );
+        });
+    }
 
-            let expression = input.text();
-            input
-                .set_secondary_icon_name((!expression.is_empty()).then_some("edit-clear-symbolic"));
-            if expression.trim().is_empty() {
-                result.set_text("Enter an expression");
-                result.add_css_class("empty");
-                status.set_text("Ready when you are");
-                copy.set_sensitive(false);
-                return;
-            }
-
-            match crate::calculate(&expression) {
-                Ok(value) => {
-                    let text = format_result(value);
-                    result.set_text(&format!("= {text}"));
-                    result.set_tooltip_text(Some(&text));
-                    result_card.add_css_class("valid");
-                    status.set_text("Live result");
-                    copy.set_sensitive(true);
+    {
+        let input = input.downgrade();
+        let help = help.downgrade();
+        let result = result.clone();
+        let copy = copy.clone();
+        let status = status.clone();
+        let result_card = result_card.clone();
+        mode.connect_toggled(move |mode| {
+            let selected = angle_mode(mode);
+            let (label, tooltip) = match selected {
+                AngleMode::Radians => ("RAD", "Angles use radians. Click to switch to degrees."),
+                AngleMode::Degrees => ("DEG", "Angles use degrees. Click to switch to radians."),
+            };
+            mode.set_label(label);
+            mode.set_tooltip_text(Some(tooltip));
+            if let Some(input) = input.upgrade() {
+                refresh_result(&input, &result, &copy, &status, &result_card, selected);
+                if let Some(help) = help.upgrade() {
+                    help.set_popover(Some(&reference_popover(&input, selected)));
                 }
-                Err(error) => {
-                    result.set_text(&error);
-                    result.set_tooltip_text(Some(&error));
-                    result.add_css_class("error");
-                    result_card.add_css_class("invalid");
-                    status.set_text("Check expression");
-                    copy.set_sensitive(false);
-                }
+                input.grab_focus();
             }
         });
     }
@@ -266,16 +265,21 @@ fn build_ui(app: &Application) {
         let window = window.downgrade();
         let input = input.downgrade();
         let status = status.downgrade();
+        let mode = mode.downgrade();
         copy.connect_clicked(move |copy| {
-            if let (Some(window), Some(input), Some(status)) =
-                (window.upgrade(), input.upgrade(), status.upgrade())
-            {
+            if let (Some(window), Some(input), Some(status), Some(mode)) = (
+                window.upgrade(),
+                input.upgrade(),
+                status.upgrade(),
+                mode.upgrade(),
+            ) {
                 copy_result(
                     window.upcast(),
                     input,
                     copy.clone(),
                     status,
                     CopyAction::KeepOpen,
+                    angle_mode(&mode),
                 );
             }
         });
@@ -284,16 +288,21 @@ fn build_ui(app: &Application) {
         let window = window.downgrade();
         let copy = copy.downgrade();
         let status = status.downgrade();
+        let mode = mode.downgrade();
         input.connect_activate(move |input| {
-            if let (Some(window), Some(copy), Some(status)) =
-                (window.upgrade(), copy.upgrade(), status.upgrade())
-            {
+            if let (Some(window), Some(copy), Some(status), Some(mode)) = (
+                window.upgrade(),
+                copy.upgrade(),
+                status.upgrade(),
+                mode.upgrade(),
+            ) {
                 copy_result(
                     window.upcast(),
                     input.clone(),
                     copy,
                     status,
                     CopyAction::Close,
+                    angle_mode(&mode),
                 );
             }
         });
@@ -320,6 +329,62 @@ fn build_ui(app: &Application) {
     input.grab_focus();
 }
 
+fn angle_mode(button: &ToggleButton) -> AngleMode {
+    if button.is_active() {
+        AngleMode::Degrees
+    } else {
+        AngleMode::Radians
+    }
+}
+
+fn refresh_result(
+    input: &Entry,
+    result: &Label,
+    copy: &Button,
+    status: &Label,
+    result_card: &GtkBox,
+    mode: AngleMode,
+) {
+    result.remove_css_class("error");
+    result.remove_css_class("empty");
+    result_card.remove_css_class("invalid");
+    result_card.remove_css_class("valid");
+    result.set_tooltip_text(None);
+    copy.remove_css_class("copied");
+    copy.set_label("Copy");
+    status.remove_css_class("error");
+    status.set_tooltip_text(None);
+
+    let expression = input.text();
+    input.set_secondary_icon_name((!expression.is_empty()).then_some("edit-clear-symbolic"));
+    if expression.trim().is_empty() {
+        result.set_text("Enter an expression");
+        result.add_css_class("empty");
+        status.set_text("Ready when you are");
+        copy.set_sensitive(false);
+        return;
+    }
+
+    match calculate_with_angle_mode(&expression, mode) {
+        Ok(value) => {
+            let text = format_result(value);
+            result.set_text(&format!("= {text}"));
+            result.set_tooltip_text(Some(&text));
+            result_card.add_css_class("valid");
+            status.set_text("Live result");
+            copy.set_sensitive(true);
+        }
+        Err(error) => {
+            result.set_text(&error);
+            result.set_tooltip_text(Some(&error));
+            result.add_css_class("error");
+            result_card.add_css_class("invalid");
+            status.set_text("Check expression");
+            copy.set_sensitive(false);
+        }
+    }
+}
+
 enum CopyAction {
     KeepOpen,
     Close,
@@ -331,8 +396,9 @@ fn copy_result(
     copy: Button,
     status: Label,
     action: CopyAction,
+    mode: AngleMode,
 ) {
-    let Ok(value) = crate::calculate(&input.text()) else {
+    let Ok(value) = calculate_with_angle_mode(&input.text(), mode) else {
         return;
     };
     let Some(content) = window.child() else {
@@ -376,7 +442,7 @@ fn copy_result(
     });
 }
 
-fn reference_popover(input: &Entry) -> Popover {
+fn reference_popover(input: &Entry, mode: AngleMode) -> Popover {
     let popover = Popover::new();
     popover.add_css_class("reference-popover");
     let content = GtkBox::new(Orientation::Vertical, 12);
@@ -394,7 +460,7 @@ fn reference_popover(input: &Entry) -> Popover {
         ("Functions", "sqrt, abs, exp, ln, log10, min, max, pow"),
         (
             "Trigonometry",
-            "sin, cos, tan, asin, acos, atan, atan2 · radians",
+            "sin, cos, tan, asin, acos, atan, atan2 · use RAD / DEG",
         ),
         ("Rounding", "floor, ceil, round"),
     ] {
@@ -415,7 +481,11 @@ fn reference_popover(input: &Entry) -> Popover {
     examples_heading.add_css_class("eyebrow");
     content.append(&examples_heading);
     let examples = GtkBox::new(Orientation::Horizontal, 6);
-    for expression in ["24 * 1.25", "sqrt(144)", "sin(pi / 2)"] {
+    let trig_example = match mode {
+        AngleMode::Radians => "sin(pi / 2)",
+        AngleMode::Degrees => "sin(90)",
+    };
+    for expression in ["24 * 1.25", "sqrt(144)", trig_example] {
         let button = Button::with_label(expression);
         button.add_css_class("example");
         let input = input.downgrade();
@@ -582,6 +652,34 @@ mod tests {
         input.emit_activate();
         assert!(window.is_visible());
 
+        let mode = find_widget::<ToggleButton>(&window, "angle-mode");
+        assert_eq!(mode.label().as_deref(), Some("RAD"));
+        assert!(!mode.is_active());
+        input.set_text("sin(90)");
+        let radians_result = result.text();
+        mode.emit_clicked();
+        assert_eq!(mode.label().as_deref(), Some("DEG"));
+        assert_eq!(input.text(), "sin(90)");
+        assert_eq!(result.text(), "= 1");
+        copy.emit_clicked();
+        wait_for_copy(&window);
+        assert_eq!(clipboard_text().as_deref(), Some("1"));
+        assert!(window.is_visible());
+        let reference = help.popover().expect("Help has a reference popover");
+        let trig_example = reference
+            .child()
+            .and_then(|content| content.last_child())
+            .and_then(|examples| examples.last_child())
+            .expect("Reference includes a trigonometry example")
+            .downcast::<Button>()
+            .expect("Example is a button");
+        assert_eq!(trig_example.label().as_deref(), Some("sin(90)"));
+        mode.emit_clicked();
+        assert_eq!(mode.label().as_deref(), Some("RAD"));
+        assert_eq!(result.text(), radians_result);
+        assert_eq!(copy.label().as_deref(), Some("Copy"));
+        assert!(!copy.has_css_class("copied"));
+
         input.set_text("2 + 2");
         assert_eq!(result.text(), "= 4");
         assert_eq!(status.text(), "Live result");
@@ -662,6 +760,18 @@ mod tests {
         assert!(window.is_visible());
         assert!(emit_key(gdk::Key::Escape));
         assert!(!window.is_visible());
+
+        let (window, input, result, _, _) = widgets();
+        let mode = find_widget::<ToggleButton>(&window, "angle-mode");
+        assert_eq!(mode.label().as_deref(), Some("RAD"));
+        mode.emit_clicked();
+        assert_eq!(result.text(), "Enter an expression");
+        input.set_text("asin(1)");
+        assert_eq!(result.text(), "= 90");
+        input.emit_activate();
+        wait_for_copy(&window);
+        assert!(!window.is_visible());
+        assert_eq!(clipboard_text().as_deref(), Some("90"));
 
         let (window, _, _, _, _) = widgets();
         find_widget::<Button>(&window, "close").emit_clicked();
